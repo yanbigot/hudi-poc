@@ -27,3 +27,8 @@ case class WorkforceAdministationBvEntity(
                    hh: String,
                    functionalData: String
                    )
+
+case class SimpleEntity(
+                       key: String,
+                       sysDate: String
+                       )

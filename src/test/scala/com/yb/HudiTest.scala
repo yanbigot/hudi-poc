@@ -35,10 +35,6 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
     val data = DataGenerator.generateRandomData(2)
 
     val df = spark.createDataFrame(spark.sparkContext.parallelize(data))
-    //    df.write.partitionBy("elr").saveAsTable("bv.business_view")
-    //
-    //    val fromHiveDf = spark.sql("SELECT * FROM bv.business_view")
-    //    fromHiveDf.show(truncate = false)
 
     val tableName = "hudi_business_view"
     val basePath = "file:///tmp/hudi_business_view"
@@ -60,6 +56,8 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
       options(bvHudiOptions).
       mode(Append).
       save(basePath)
+
+
   }
 
   "Hudi" should "upsert data and then read all data and then only the last upserted ones" in {
@@ -168,4 +166,22 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
     val endDate = System.nanoTime()
   }
 
+  "Hudi" should "be understandable to yan" in {
+    val data = DataGenerator.generateSimpleData(1)
+    val df   = spark.createDataFrame(spark.sparkContext.parallelize(data))
+    val tableName = "hudi_simple_table"
+    val basePath = "file:///tmp/hudi_simple_table"
+
+    df.write.format("org.apache.hudi").
+      option(RECORDKEY_FIELD_OPT_KEY, "key").
+      option(PRECOMBINE_FIELD_OPT_KEY, "key").
+      option(PARTITIONPATH_FIELD_OPT_KEY, "").
+      option(TABLE_NAME, tableName).
+      mode(Append).
+      save(basePath)
+
+
+
+
+  }
 }

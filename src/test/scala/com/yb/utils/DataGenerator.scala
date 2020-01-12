@@ -3,7 +3,7 @@ package com.yb.utils
 import java.time.LocalDate
 import java.util.UUID
 
-import com.yb.model.{Entity, WorkforceAdministationBvEntity}
+import com.yb.model.{Entity, SimpleEntity, WorkforceAdministationBvEntity}
 
 import scala.util.Random
 
@@ -88,4 +88,16 @@ object DataGenerator {
       )
     }
   }
+
+  def generateSimpleData(n: Int = 10) ={
+
+    for(i <- 1 to n) yield {
+      SimpleEntity(
+        key = i toString,
+        sysDate = "B"
+//        sysDate = System.currentTimeMillis() toString
+      )
+    }
+  }
 }
+
