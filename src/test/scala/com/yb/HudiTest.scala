@@ -2,10 +2,10 @@ package com.yb
 
 import com.holdenkarau.spark.testing.DataFrameSuiteBase
 import com.yb.utils.DataGenerator
-import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions}
 import org.apache.hudi.DataSourceWriteOptions.{PARTITIONPATH_FIELD_OPT_KEY, PRECOMBINE_FIELD_OPT_KEY, RECORDKEY_FIELD_OPT_KEY}
 import org.apache.hudi.config.HoodieWriteConfig
 import org.apache.hudi.config.HoodieWriteConfig.TABLE_NAME
+import org.apache.hudi.{DataSourceReadOptions, DataSourceWriteOptions}
 import org.apache.spark.sql.SaveMode.Append
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -14,7 +14,8 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
   import spark.implicits._
 
   def setUpDatabase = {
-    spark.sql("""
+    spark.sql(
+      """
         |SET hive.input.format=org.apache.hudi.hadoop.HoodieParquetInputFormat;
         |
       """.stripMargin)
@@ -23,7 +24,7 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
 
   "Hive" should "initialize properly" in {
     this.setUpDatabase
-    val data = DataGenerator.generateData()
+    val data = DataGenerator.generateRandomData()
     val df = spark.createDataFrame(spark.sparkContext.parallelize(data))
     df.write.partitionBy("elr").saveAsTable("bv.business_view")
     spark.sql("SELECT * FROM bv.business_view").show(truncate = false)
@@ -31,13 +32,13 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
 
   "Hudi" should "create Hive table" in {
     this.setUpDatabase
-    val data = DataGenerator.generateData(2)
+    val data = DataGenerator.generateRandomData(2)
 
     val df = spark.createDataFrame(spark.sparkContext.parallelize(data))
-//    df.write.partitionBy("elr").saveAsTable("bv.business_view")
-//
-//    val fromHiveDf = spark.sql("SELECT * FROM bv.business_view")
-//    fromHiveDf.show(truncate = false)
+    //    df.write.partitionBy("elr").saveAsTable("bv.business_view")
+    //
+    //    val fromHiveDf = spark.sql("SELECT * FROM bv.business_view")
+    //    fromHiveDf.show(truncate = false)
 
     val tableName = "hudi_business_view"
     val basePath = "file:///tmp/hudi_business_view"
@@ -52,7 +53,7 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
       DataSourceWriteOptions.HIVE_TABLE_OPT_KEY → tableName,
       DataSourceWriteOptions.HIVE_PARTITION_FIELDS_OPT_KEY → "elr",
       DataSourceWriteOptions.HIVE_URL_OPT_KEY → "thrift://localhost:9083"
-//      ,DataSourceWriteOptions.HIVE_PARTITION_EXTRACTOR_CLASS_OPT_KEY → classOf[MultiPartKeysValueExtractor].getName
+      //      ,DataSourceWriteOptions.HIVE_PARTITION_EXTRACTOR_CLASS_OPT_KEY → classOf[MultiPartKeysValueExtractor].getName
     )
     df.write.
       format("org.apache.hudi").
@@ -64,7 +65,7 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
   "Hudi" should "upsert data and then read all data and then only the last upserted ones" in {
 
     this.setUpDatabase
-    val data = DataGenerator.generateData()
+    val data = DataGenerator.generateRandomData(220000)
     val df = spark.createDataFrame(spark.sparkContext.parallelize(data))
     df.show
     println("generated entity objects: " + df.count)
@@ -105,6 +106,66 @@ class HudiTest extends FlatSpec with DataFrameSuiteBase with Matchers {
     incViewDF.registerTempTable("hudi_incr_table")
     spark.sql("select `_hoodie_commit_time`, ggi, elr, hh, col1, sysDate, executionId from  hudi_incr_table").show()
     spark.sql("select count(ggi) from  hudi_incr_table").show(10000)
+  }
+
+  "Workforce administration bv" should "be created properly" in {
+    val data = DataGenerator.generateBusinessViewData(100000)
+    val df = spark.createDataFrame(spark.sparkContext.parallelize(data))
+
+    val tableName = "workforce_administration"
+    val basePath = "file:///tmp/workforce_administration"
+
+    df.write.format("org.apache.hudi").
+      option(RECORDKEY_FIELD_OPT_KEY, "mergeKey").
+      option(PRECOMBINE_FIELD_OPT_KEY, "executionId").
+      option(PARTITIONPATH_FIELD_OPT_KEY, "entityName").
+      option(TABLE_NAME, tableName).
+      mode(Append).
+      save(basePath)
+
+    val fromHudiTableDf = spark.
+      read.
+      format("org.apache.hudi").
+      load(basePath + "/*")
+    fromHudiTableDf.createOrReplaceTempView("hudi_ro_workforce_administration_table")
+
+    val dfCount = df.count
+    val fromHudiTableDfCount = fromHudiTableDf.count
+    println("generated entity objects: " + dfCount)
+    println("generated entity objects: " + fromHudiTableDfCount)
+
+  }
+
+  "Workforce administration bv" should "upsert properly for small amount of data" in {
+    val data = DataGenerator.generateBusinessViewData(100)
+    val df = spark.createDataFrame(spark.sparkContext.parallelize(data))
+
+    val tableName = "workforce_administration"
+    val basePath = "file:///tmp/workforce_administration"
+
+
+    val startDate = System.nanoTime()
+
+    df.write.format("org.apache.hudi").
+      option(RECORDKEY_FIELD_OPT_KEY, "mergeKey").
+      option(PRECOMBINE_FIELD_OPT_KEY, "executionId").
+      option(PARTITIONPATH_FIELD_OPT_KEY, "entityName").
+      option(TABLE_NAME, tableName).
+      mode(Append).
+      save(basePath)
+
+    val fromHudiTableDf = spark.
+      read.
+      format("org.apache.hudi").
+      load(basePath + "/*")
+    fromHudiTableDf.createOrReplaceTempView("hudi_ro_workforce_administration_table")
+
+    val dfCount = df.count
+    val fromHudiTableDfCount = fromHudiTableDf.count
+    println("generated entity objects: " + dfCount)
+    println("generated entity objects: " + fromHudiTableDfCount)
+
+    val endDate = System.nanoTime()
   }
 
 }
